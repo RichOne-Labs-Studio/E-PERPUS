@@ -1,0 +1,8 @@
+{
+  "name": "E-Perpus DKPPP Cirebon",
+  "description": "Perpustakaan Digital Laporan Perencanaan dan Pelaporan Dinas Ketahanan Pangan, Pertanian dan Perikanan Kota Cirebon",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

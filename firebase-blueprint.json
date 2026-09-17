@@ -1,0 +1,21 @@
+{
+  "entities": {
+    "Document": {
+      "title": "string",
+      "category": "string",
+      "year": "number",
+      "type": "string",
+      "size": "string",
+      "description": "string",
+      "dateAdded": "string",
+      "coverColor": "string",
+      "coverBase64": "string",
+      "fileData": "string"
+    }
+  },
+  "firestore": {
+    "documents": {
+      "entity": "Document"
+    }
+  }
+}
