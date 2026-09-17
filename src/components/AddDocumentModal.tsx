@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, UploadCloud } from 'lucide-react';
 import { Document, DocumentCategory } from '../types';
+import { supabase } from '../lib/supabase';
 
 export function AddDocumentModal({ onClose, onAdd }: { onClose: () => void, onAdd: (doc: Document) => void }) {
   const [title, setTitle] = useState('');
@@ -37,17 +38,28 @@ export function AddDocumentModal({ onClose, onAdd }: { onClose: () => void, onAd
       let coverUrl = '';
       const uniqueId = Date.now().toString();
 
-      // For Supabase readiness, we simulate success for now
+      // Upload Document File ke Supabase Storage (Bucket 'files')
       if (rawFile) {
-        fileUrl = URL.createObjectURL(rawFile);
+        const filePath = `documents/${uniqueId}_${rawFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        const { error: uploadError } = await supabase.storage.from('files').upload(filePath, rawFile);
+        if (uploadError) throw uploadError;
+        
+        const { data: publicUrlData } = supabase.storage.from('files').getPublicUrl(filePath);
+        fileUrl = publicUrlData.publicUrl;
       }
 
+      // Upload Cover File ke Supabase Storage (Bucket 'files')
       if (rawCover) {
-        coverUrl = URL.createObjectURL(rawCover);
+        const coverPath = `covers/${uniqueId}_${rawCover.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        const { error: uploadError } = await supabase.storage.from('files').upload(coverPath, rawCover);
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage.from('files').getPublicUrl(coverPath);
+        coverUrl = publicUrlData.publicUrl;
       }
 
       const newDoc: Document = {
-        id: 'doc-' + uniqueId,
+        id: 'doc-' + uniqueId, // Akan diganti oleh Supabase jika menggunakan auto-increment, tapi tidak apa-apa diset sementara
         title,
         category,
         type: fileType,
@@ -63,7 +75,14 @@ export function AddDocumentModal({ onClose, onAdd }: { onClose: () => void, onAd
       onAdd(newDoc);
     } catch (err: any) {
       console.error("Upload error:", err);
-      setErrorMsg("Gagal mengunggah dokumen: " + err.message);
+      // Deteksi jika bucket belum ada
+      if (err.message?.includes('bucket not found') || err.message?.includes('The resource was not found')) {
+        setErrorMsg("Storage Bucket 'files' belum dibuat di Supabase Anda. Silakan buat bucket public bernama 'files'.");
+      } else if (err.message?.includes('new row violates row-level security')) {
+        setErrorMsg("Gagal mengunggah karena aturan keamanan (RLS) Supabase Storage menolak aksi ini.");
+      } else {
+        setErrorMsg("Gagal mengunggah dokumen: " + (err.message || 'Unknown error'));
+      }
       setIsLoading(false);
     }
   };

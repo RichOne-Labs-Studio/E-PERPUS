@@ -9,6 +9,7 @@ import { AddDocumentModal } from './components/AddDocumentModal';
 import { SettingsModal } from './components/SettingsModal';
 import { mockDocuments } from './data';
 import { DocumentCategory, Document } from './types';
+import { supabase } from './lib/supabase';
 
 export default function App() {
   const [activeCategory, setActiveCategory] = useState<DocumentCategory | 'Dashboard'>('Dashboard');
@@ -27,11 +28,44 @@ export default function App() {
   const [viewDocument, setViewDocument] = useState<Document | null>(null);
 
   useEffect(() => {
-    // Simulasi memuat data
-    setTimeout(() => {
-      setDocuments(mockDocuments);
-      setIsLoadingDocs(false);
-    }, 500);
+    const loadDocuments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('*')
+          .order('dateAdded', { ascending: false });
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          setDocuments(data);
+        } else {
+          // Jika tabel kosong, kita bisa mencoba memasukkan mock data
+          const { error: insertError } = await supabase
+            .from('documents')
+            .insert(mockDocuments.map(({ id, ...doc }) => doc)); // omit id supaya Supabase buatkan UUID/auto-increment
+
+          if (!insertError) {
+            const { data: newData } = await supabase.from('documents').select('*').order('dateAdded', { ascending: false });
+            if (newData) setDocuments(newData);
+          } else {
+            // Fallback ke mock data jika RLS/Tabel mencegah insert
+            setDocuments(mockDocuments);
+          }
+        }
+      } catch (error: any) {
+        console.error("Error mengambil data dari Supabase:", error);
+        // Fallback jika tabel 'documents' belum ada
+        if (error.message?.includes('relation "public.documents" does not exist')) {
+          console.warn("Tabel 'documents' belum dibuat di Supabase. Menampilkan data lokal sementara.");
+        }
+        setDocuments(mockDocuments);
+      } finally {
+        setIsLoadingDocs(false);
+      }
+    };
+    
+    loadDocuments();
   }, []);
 
   const handleLoginSuccess = () => {
@@ -45,13 +79,39 @@ export default function App() {
     localStorage.removeItem('eperpus_admin');
   };
 
-  const handleAddDocument = (newDoc: Document) => {
-    setDocuments([newDoc, ...documents]);
-    setShowAddModal(false);
+  const handleAddDocument = async (newDoc: Document) => {
+    try {
+      // Hilangkan ID sementara dari object sebelum insert agar Supabase membuat ID unik
+      const { id, ...docData } = newDoc;
+      const { data, error } = await supabase.from('documents').insert([docData]).select();
+      
+      if (error) {
+        console.error("Error insert row:", error);
+        alert("Gagal menyimpan ke database Supabase: " + error.message);
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        setDocuments([data[0] as Document, ...documents]);
+      } else {
+        // Fallback jika tidak ada data yang di-return (karena RLS misalnya)
+        setDocuments([newDoc, ...documents]);
+      }
+      setShowAddModal(false);
+    } catch (e) {
+      console.error("Error adding document:", e);
+    }
   };
 
-  const handleDeleteDocument = (id: string) => {
-    setDocuments(documents.filter(doc => doc.id !== id));
+  const handleDeleteDocument = async (id: string) => {
+    try {
+      const { error } = await supabase.from('documents').delete().eq('id', id);
+      if (error) throw error;
+      setDocuments(documents.filter(doc => doc.id !== id));
+    } catch (error: any) {
+      console.error("Error menghapus dokumen: ", error);
+      alert("Gagal menghapus dokumen: " + error.message);
+    }
   };
 
   // If search query is active, switch from Dashboard to "Semua" implicitly for better UX
