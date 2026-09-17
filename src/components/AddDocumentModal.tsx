@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { X, UploadCloud } from 'lucide-react';
 import { Document, DocumentCategory } from '../types';
-import { storage } from '../lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export function AddDocumentModal({ onClose, onAdd }: { onClose: () => void, onAdd: (doc: Document) => void }) {
   const [title, setTitle] = useState('');
@@ -39,18 +37,13 @@ export function AddDocumentModal({ onClose, onAdd }: { onClose: () => void, onAd
       let coverUrl = '';
       const uniqueId = Date.now().toString();
 
-      // Upload Document File
+      // For Supabase readiness, we simulate success for now
       if (rawFile) {
-        const fileRef = ref(storage, `documents/${uniqueId}_${rawFile.name}`);
-        await uploadBytes(fileRef, rawFile);
-        fileUrl = await getDownloadURL(fileRef);
+        fileUrl = URL.createObjectURL(rawFile);
       }
 
-      // Upload Cover File
       if (rawCover) {
-        const coverRef = ref(storage, `covers/${uniqueId}_${rawCover.name}`);
-        await uploadBytes(coverRef, rawCover);
-        coverUrl = await getDownloadURL(coverRef);
+        coverUrl = URL.createObjectURL(rawCover);
       }
 
       const newDoc: Document = {
@@ -63,19 +56,14 @@ export function AddDocumentModal({ onClose, onAdd }: { onClose: () => void, onAd
         size: rawFile ? (rawFile.size / (1024 * 1024)).toFixed(2) + ' MB' : '0 MB',
         description: desc,
         coverColor: randomColor,
-        coverBase64: coverUrl, // Overloading the base64 property to hold URL
-        fileData: fileUrl      // Overloading the base64 property to hold URL
+        coverBase64: coverUrl,
+        fileData: fileUrl
       };
       
       onAdd(newDoc);
     } catch (err: any) {
       console.error("Upload error:", err);
-      // Fallback or show error
-      if (err.code === 'storage/unauthorized') {
-        setErrorMsg("Gagal mengunggah karena aturan keamanan Storage belum dikonfigurasi. Hubungi administrator.");
-      } else {
-        setErrorMsg("Gagal mengunggah dokumen: " + err.message);
-      }
+      setErrorMsg("Gagal mengunggah dokumen: " + err.message);
       setIsLoading(false);
     }
   };

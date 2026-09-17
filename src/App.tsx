@@ -9,8 +9,6 @@ import { AddDocumentModal } from './components/AddDocumentModal';
 import { SettingsModal } from './components/SettingsModal';
 import { mockDocuments } from './data';
 import { DocumentCategory, Document } from './types';
-import { documentsCollection, db } from './lib/firebase';
-import { getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 
 export default function App() {
   const [activeCategory, setActiveCategory] = useState<DocumentCategory | 'Dashboard'>('Dashboard');
@@ -29,35 +27,11 @@ export default function App() {
   const [viewDocument, setViewDocument] = useState<Document | null>(null);
 
   useEffect(() => {
-    const loadDocuments = async () => {
-      try {
-        const querySnapshot = await getDocs(documentsCollection);
-        let docs = querySnapshot.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id
-        })) as Document[];
-        
-        // Seed mock documents if database is empty
-        if (docs.length === 0) {
-          for (const mDoc of mockDocuments) {
-            const { id, ...docData } = mDoc;
-            const docRef = await addDoc(documentsCollection, docData);
-            docs.push({ ...mDoc, id: docRef.id });
-          }
-        }
-        
-        // Sort by date added (newest first)
-        docs.sort((a, b) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime());
-        
-        setDocuments(docs);
-      } catch (error) {
-        console.error("Error fetching documents: ", error);
-      } finally {
-        setIsLoadingDocs(false);
-      }
-    };
-    
-    loadDocuments();
+    // Simulasi memuat data
+    setTimeout(() => {
+      setDocuments(mockDocuments);
+      setIsLoadingDocs(false);
+    }, 500);
   }, []);
 
   const handleLoginSuccess = () => {
@@ -71,37 +45,13 @@ export default function App() {
     localStorage.removeItem('eperpus_admin');
   };
 
-  const handleAddDocument = async (newDoc: Document) => {
-    try {
-      const docRef = await addDoc(documentsCollection, {
-        title: newDoc.title,
-        category: newDoc.category,
-        type: newDoc.type,
-        year: newDoc.year,
-        dateAdded: newDoc.dateAdded,
-        size: newDoc.size,
-        description: newDoc.description,
-        coverColor: newDoc.coverColor,
-        coverBase64: newDoc.coverBase64 || '',
-        fileData: newDoc.fileData || ''
-      });
-      
-      const savedDoc = { ...newDoc, id: docRef.id };
-      setDocuments([savedDoc, ...documents]);
-      setShowAddModal(false);
-    } catch (e) {
-      console.error("Error adding document: ", e);
-    }
+  const handleAddDocument = (newDoc: Document) => {
+    setDocuments([newDoc, ...documents]);
+    setShowAddModal(false);
   };
 
-  const handleDeleteDocument = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, 'documents', id));
-      setDocuments(documents.filter(doc => doc.id !== id));
-    } catch (error) {
-      console.error("Error deleting document: ", error);
-      // alert removed due to iframe restrictions
-    }
+  const handleDeleteDocument = (id: string) => {
+    setDocuments(documents.filter(doc => doc.id !== id));
   };
 
   // If search query is active, switch from Dashboard to "Semua" implicitly for better UX
